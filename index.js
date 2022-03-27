@@ -182,6 +182,38 @@ function rmsvalue(samples) {
 
 }
 
+function min_max(samples) {
+
+    let Temp = []
+    let Humidity = []
+    let Power = []
+    let battery = []
+
+    let n = samples.length
+
+    for (var i = 0; i < n; i++) {
+
+        Temp[i] = samples[i].data.tempVal.value
+        Humidity[i] = samples[i].data.humidityVal.value
+        Power[i] = samples[i].data.powerVal.value
+        battery[i] = samples[i].data.batteryVal.value
+
+    }
+
+    mintemp = ss.max(Temp)
+    minHumidity = ss.max(Humidity)
+    minPower = ss.max(Power)
+    minbattery = ss.max(battery)
+
+    maxtemp = ss.min(Temp)
+    maxHumidity = ss.min(Humidity)
+    maxPower = ss.min(Power)
+    maxbattery = ss.min(battery)
+
+    return { mintemp, minHumidity, minPower, minbattery, maxtemp, maxHumidity, maxPower, maxbattery }
+
+}
+
 function fftValue(frequencyData)
 {
     let len = frequencyData.length
@@ -287,7 +319,9 @@ app.post('/api/data', async (req, res) => {
 
         standard_deviation = std(new_data)
 
-        res.send({ new_data, mean, rms, median, standard_deviation });
+        min_max_value = min_max(new_data)
+
+        res.send({ new_data, mean, rms, median, standard_deviation, min_max_value });
 
     } catch (e) {
         res.status(500).send(e);
@@ -334,6 +368,9 @@ app.get('/csv', async(req, res) => {
 
         excelData = data[0].samples
 
+        var date = new Date(Date.now());
+        var date_string = date.toLocaleString('en-GB', { day: 'numeric', month: 'short'});
+
         XlsxPopulate.fromBlankAsync().then(workbook => {
 
             let index = 2
@@ -358,12 +395,12 @@ app.get('/csv', async(req, res) => {
                 return res.status(400).json({ message: 'OTP Expired' });
             }
             else {
-                return workbook.toFileAsync("./Data.xlsx", { password: `${OTP}` });
+                return workbook.toFileAsync(`./${date_string} Data.xlsx`, { password: `${OTP}` });
             };
 
         });
 
-        const file = __dirname + "/Data.xlsx"
+        const file = __dirname + `/${date_string} Data.xlsx`
         const fileName = path.basename(file)
         const mimeType = mime.getType(file)
         res.setHeader("Content-Disposition", "attachment;filename=" + fileName)
@@ -372,7 +409,7 @@ app.get('/csv', async(req, res) => {
         setTimeout(() => {
             res.download(file)
 
-        }, 3000);
+        }, 4000);
 
 
     } catch (e) {
@@ -475,8 +512,9 @@ app.post('/generate', async (req, res) => {
         if(user.length > 0)
         {
             OTP = Math.floor(Math.random() * (9 * (Math.pow(10, 5)))) + (Math.pow(10, 5));
-            epoch_date = Date.now();
-            var myDate = new Date(epoch_date * 1000)
+
+            var date = new Date(Date.now());
+            var date_string = date.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: 'numeric' });
 
             var mailOptions = {
                 from: 'gurveer0091@gmail.com',
@@ -486,7 +524,7 @@ app.post('/generate', async (req, res) => {
                     <h2> Use this OTP to Download the File</h2>
                     <h4> Message : otp will expire in 20 seconds</h4>
                     <h4> OTP : ${OTP}</h4>
-                    <h4> Date : ${myDate}</h4>`
+                    <h4> Date : ${date_string}</h4>`
             }
 
             transporter.sendMail(mailOptions, function (error, info) {
@@ -502,13 +540,13 @@ app.post('/generate', async (req, res) => {
             setTimeout(() => {
                 otpgenerator()
 
-            }, 50000);
+            }, 86400000);
 
             res.json('Otp sent successfully');
         }
 
         else{
-            return res.status(400).json({ message: 'User Login Failed' });
+            return res.status(400).json({ message: 'OTP Failed' });
         }
 
     } catch (err) {
@@ -517,16 +555,6 @@ app.post('/generate', async (req, res) => {
     }
 })
 
-app.get('/api/otp', async (req, res) => {
-
-    try {
-        res.json(OTP);
-
-    } catch (err) {
-        console.log(err.message);
-        res.status(500).send("Error occured");
-    }
-})
 
 
 
